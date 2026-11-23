@@ -1,0 +1,1094 @@
+<!DOCTYPE html>
+<html lang="de" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Familien-Tracker: Nicole & Florian</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- SheetJS für echten Excel-Export (.xlsx) -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <!-- Google Font Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        nicole: {
+                            light: '#fdf2f8',
+                            DEFAULT: '#db2777',
+                            dark: '#9d174d',
+                            border: '#fbcfe8'
+                        },
+                        florian: {
+                            light: '#eff6ff',
+                            DEFAULT: '#2563eb',
+                            dark: '#1e40af',
+                            border: '#bfdbfe'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Verhindert unerwünschtes Pull-to-Refresh und verbessert Touch-Verhalten auf Android */
+        body {
+            overscroll-behavior-y: contain;
+            -webkit-tap-highlight-color: transparent;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 font-sans min-h-screen pb-24 transition-colors duration-200">
+
+    <!-- Header & Datumsauswahl (Sticky Top) -->
+    <header class="sticky top-0 z-30 bg-white/90 dark:bg-slate-800/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-700 shadow-sm">
+        <div class="max-w-lg mx-auto px-4 py-3">
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-pink-500 to-blue-600 flex items-center justify-center text-white font-bold shadow-sm">
+                        N&F
+                    </div>
+                    <h1 class="text-lg font-bold tracking-tight">Tages-Tracker</h1>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="exportSourceCode()" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 transition" title="HTML-Code sichern" aria-label="HTML-Code exportieren">
+                        <i data-lucide="code-2" class="w-4 h-4"></i>
+                    </button>
+                    <button onclick="toggleTheme()" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 transition" aria-label="Theme wechseln">
+                        <i data-lucide="moon" class="w-5 h-5 hidden dark:block"></i>
+                        <i data-lucide="sun" class="w-5 h-5 block dark:hidden"></i>
+                    </button>
+                    <button onclick="openStatsModal()" class="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 font-medium text-xs flex items-center gap-1 border border-indigo-200 dark:border-indigo-800">
+                        <i data-lucide="bar-chart-2" class="w-4 h-4"></i>
+                        <span>Statistik</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Datums-Navigation -->
+            <div class="flex items-center justify-between bg-slate-100 dark:bg-slate-700/60 p-1.5 rounded-2xl">
+                <button onclick="changeDate(-1)" class="px-3 py-2 rounded-xl bg-white dark:bg-slate-800 shadow-sm active:scale-95 transition flex items-center gap-1 text-xs font-semibold text-slate-700 dark:text-slate-200" aria-label="Vorheriger Tag">
+                    <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                    <span>-1 Tag</span>
+                </button>
+                <div class="flex flex-col items-center px-2">
+                    <div class="relative flex items-center gap-1.5">
+                        <i data-lucide="calendar" class="w-4 h-4 text-indigo-600 dark:text-indigo-400"></i>
+                        <input type="date" id="datePicker" onchange="onDateInput(this.value)" class="bg-transparent font-bold text-base text-slate-900 dark:text-white text-center focus:outline-none cursor-pointer">
+                    </div>
+                    <span id="weekdayLabel" class="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Heute</span>
+                </div>
+                <button onclick="changeDate(1)" class="px-3 py-2 rounded-xl bg-white dark:bg-slate-800 shadow-sm active:scale-95 transition flex items-center gap-1 text-xs font-semibold text-slate-700 dark:text-slate-200" aria-label="Nächster Tag">
+                    <span>+1 Tag</span>
+                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hauptbereich: Kategorien-Liste -->
+    <main class="max-w-lg mx-auto px-3 pt-4 space-y-2.5" id="categoriesContainer">
+        <!-- Kategorien werden hier per JS gerendert -->
+    </main>
+
+    <!-- Bottom Action Bar (Sticky Bottom) -->
+    <nav class="fixed bottom-0 left-0 right-0 z-30 bg-white/95 dark:bg-slate-800/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-700 px-4 py-3 shadow-lg">
+        <div class="max-w-lg mx-auto flex items-center gap-3">
+            <button onclick="openAddCategoryModal()" class="flex-1 py-3 px-4 rounded-2xl bg-slate-900 dark:bg-slate-700 text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-sm active:scale-98 transition">
+                <i data-lucide="plus-circle" class="w-5 h-5 text-emerald-400"></i>
+                <span>Neue Kategorie</span>
+            </button>
+            <button onclick="openExportModal()" class="flex-1 py-3 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-sm active:scale-98 transition">
+                <i data-lucide="file-spreadsheet" class="w-5 h-5"></i>
+                <span>Excel Export</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Toast Notification (statt alert) -->
+    <div id="toast" class="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-slate-800 text-white text-xs font-medium px-4 py-2.5 rounded-full shadow-xl opacity-0 pointer-events-none transition-opacity duration-300 flex items-center gap-2">
+        <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
+        <span id="toastText">Gespeichert</span>
+    </div>
+
+    <!-- MODAL 1: Neue Kategorie hinzufügen -->
+    <div id="addCategoryModal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs hidden items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-white dark:bg-slate-800 w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl space-y-5 animate-slide-up">
+            <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-3">
+                <h2 class="text-lg font-bold">Neue Kategorie erstellen</h2>
+                <button onclick="closeModal('addCategoryModal')" class="p-1.5 rounded-full bg-slate-100 dark:bg-slate-700">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Name der Kategorie</label>
+                    <input type="text" id="newCatName" placeholder="z.B. Rasen mähen, Vorlesen..." class="w-full px-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-700 border border-transparent focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-none text-sm">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Eingabe-Typ wählen</label>
+                    <div class="grid grid-cols-2 gap-2.5" id="typeSelectorGrid">
+                        <button type="button" onclick="selectNewCatType('person')" data-type="person" class="type-btn p-3 rounded-xl border-2 border-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 text-left transition">
+                            <div class="font-bold text-sm text-indigo-700 dark:text-indigo-300">Person (N / F)</div>
+                            <div class="text-[11px] text-slate-500 dark:text-slate-400">Nicole und/oder Florian</div>
+                        </button>
+                        <button type="button" onclick="selectNewCatType('minutes')" data-type="minutes" class="type-btn p-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 text-left transition">
+                            <div class="font-bold text-sm">Minuten</div>
+                            <div class="text-[11px] text-slate-500 dark:text-slate-400">Dauer in Min. erfassen</div>
+                        </button>
+                        <button type="button" onclick="selectNewCatType('count')" data-type="count" class="type-btn p-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 text-left transition">
+                            <div class="font-bold text-sm">Anzahl</div>
+                            <div class="text-[11px] text-slate-500 dark:text-slate-400">Zähler (z.B. 1 bis 5)</div>
+                        </button>
+                        <button type="button" onclick="selectNewCatType('checkbox')" data-type="checkbox" class="type-btn p-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 text-left transition">
+                            <div class="font-bold text-sm">Checkbox</div>
+                            <div class="text-[11px] text-slate-500 dark:text-slate-400">Einfach Abhaken (Erledigt)</div>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Zusatzoption für Personenzuordnung bei Minuten/Anzahl/Checkbox -->
+                <div id="ownerOptionDiv" class="hidden">
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Wem wird der Wert zugeordnet?</label>
+                    <select id="newCatOwner" class="w-full px-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-700 text-sm focus:outline-none">
+                        <option value="both">Beiden / Auswählbar pro Eintrag</option>
+                        <option value="Nicole">Fix: Nur Nicole</option>
+                        <option value="Florian">Fix: Nur Florian</option>
+                    </select>
+                </div>
+            </div>
+
+            <button onclick="saveNewCategory()" class="w-full py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md active:scale-98 transition">
+                Kategorie hinzufügen
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL 2: Excel Export -->
+    <div id="exportModal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs hidden items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-white dark:bg-slate-800 w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl space-y-5">
+            <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-3">
+                <h2 class="text-lg font-bold flex items-center gap-2">
+                    <i data-lucide="file-spreadsheet" class="w-5 h-5 text-emerald-600"></i>
+                    Excel-Auswertung (.xlsx)
+                </h2>
+                <button onclick="closeModal('exportModal')" class="p-1.5 rounded-full bg-slate-100 dark:bg-slate-700">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                Die Excel-Datei enthält zwei Tabellenblätter: <strong>1. Auswertung nach Person</strong> (Summen für Nicole & Florian) und <strong>2. Tagesprotokoll</strong> (alle Einzelwerte).
+            </p>
+
+            <div class="space-y-2.5">
+                <button onclick="exportExcel('week')" class="w-full p-4 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-emerald-500 bg-slate-50 dark:bg-slate-700/40 flex items-center justify-between transition">
+                    <div class="text-left">
+                        <div class="font-bold text-sm">Aktuelle Woche (Mo – So)</div>
+                        <div class="text-xs text-slate-500" id="exportWeekLabel">Wochenübersicht exportieren</div>
+                    </div>
+                    <i data-lucide="download" class="w-5 h-5 text-emerald-600"></i>
+                </button>
+
+                <button onclick="exportExcel('month')" class="w-full p-4 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-emerald-500 bg-slate-50 dark:bg-slate-700/40 flex items-center justify-between transition">
+                    <div class="text-left">
+                        <div class="font-bold text-sm">Aktueller Monat</div>
+                        <div class="text-xs text-slate-500" id="exportMonthLabel">Monatsübersicht exportieren</div>
+                    </div>
+                    <i data-lucide="download" class="w-5 h-5 text-emerald-600"></i>
+                </button>
+
+                <button onclick="exportExcel('all')" class="w-full p-4 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-emerald-500 bg-slate-50 dark:bg-slate-700/40 flex items-center justify-between transition">
+                    <div class="text-left">
+                        <div class="font-bold text-sm">Gesamter Zeitraum</div>
+                        <div class="text-xs text-slate-500">Alle gespeicherten Tage exportieren</div>
+                    </div>
+                    <i data-lucide="download" class="w-5 h-5 text-emerald-600"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: Schnell-Statistik & Filter Ansicht -->
+    <div id="statsModal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs hidden items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-white dark:bg-slate-800 w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl max-h-[85vh] flex flex-col">
+            <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-3 mb-3">
+                <h2 class="text-lg font-bold">Auswertung & Filter</h2>
+                <button onclick="closeModal('statsModal')" class="p-1.5 rounded-full bg-slate-100 dark:bg-slate-700">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <!-- Filter Dropdowns für Woche & Kategorie -->
+            <div class="grid grid-cols-2 gap-2.5 mb-3">
+                <div>
+                    <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Zeitraum / Woche</label>
+                    <select id="statsWeekFilter" onchange="renderFilteredStats()" class="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-xs font-semibold focus:outline-none border border-transparent focus:border-indigo-500">
+                        <!-- Wird dynamisch mit Wochen & Monat befüllt -->
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Kategorie filtern</label>
+                    <select id="statsCategoryFilter" onchange="renderFilteredStats()" class="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-xs font-semibold focus:outline-none border border-transparent focus:border-indigo-500">
+                        <option value="ALL">Alle Kategorien</option>
+                        <!-- Wird dynamisch mit Kategorien befüllt -->
+                    </select>
+                </div>
+            </div>
+
+            <div id="statsContent" class="overflow-y-auto space-y-2 pr-1 text-xs">
+                <!-- Dynamische Auswertung -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * INITIALE KATEGORIEN IN EXAKT DER GEWÜNSCHTEN REIHENFOLGE
+         * Typen:
+         * - 'person': Auswahl Nicole und/oder Florian (Toggle-Buttons)
+         * - 'minutes': Minuten-Eingabe (mit optionaler Personenzuordnung)
+         * - 'count': Anzahl-Auswahl (z.B. 1-2 oder 1-5 + Person)
+         * - 'checkbox': Einfaches Abhaken (oder Nicole/Florian)
+         */
+        const DEFAULT_CATEGORIES = [
+            { id: 'fruehstueck', name: 'Frühstück gemacht', type: 'person' },
+            { id: 'jause', name: 'Jause gemacht', type: 'person' },
+            { id: 'bus', name: 'Zum Bus gebracht', type: 'person' },
+            { id: 'krippe', name: 'Zur Krippe gebracht', type: 'person' },
+            { id: 'mittagessen', name: 'Mittagessen', type: 'person' },
+            { id: 'abendessen', name: 'Abendessen', type: 'person' },
+            { id: 'kinder_min', name: 'Kinder (Minuten)', type: 'minutes', perPerson: true },
+            { id: 'zaehneputzen', name: 'Zähneputzen (1 oder 2)', type: 'count', max: 2, perPerson: true },
+            { id: 'lesen', name: 'Lesen', type: 'person' },
+            { id: 'schlafen', name: 'Schlafen', type: 'person' },
+            { id: 'saugen', name: 'Saugen', type: 'person' },
+            { id: 'geschirrspueler', name: 'Geschirrspüler (1–5)', type: 'count', max: 5, perPerson: true },
+            { id: 'muell', name: 'Müll', type: 'person' },
+            { id: 'waesche_waschen', name: 'Wäsche waschen', type: 'person' },
+            { id: 'waesche_aufhaengen', name: 'Wäsche aufhängen', type: 'person' },
+            { id: 'waesche_abhaengen', name: 'Wäsche abhängen', type: 'person' },
+            { id: 'waesche_einordnen', name: 'Wäsche einordnen', type: 'person' },
+            { id: 'arzt', name: 'Arzt', type: 'person' },
+            { id: 'tanken', name: 'Tanken', type: 'person' },
+            { id: 'einkaufen', name: 'Einkaufen', type: 'person' },
+            { id: 'freizeit_flo', name: 'Freizeit Flo (Minuten)', type: 'minutes', fixedOwner: 'Florian' },
+            { id: 'freizeit_nicole', name: 'Freizeit Nicole (Minuten)', type: 'minutes', fixedOwner: 'Nicole' },
+            { id: 'sport_nicole', name: 'Sport Nicole', type: 'checkbox', fixedOwner: 'Nicole' },
+            { id: 'tennis_flo', name: 'Tennis Flo', type: 'checkbox', fixedOwner: 'Florian' },
+            { id: 'sport_kids', name: 'Sport mit Kids', type: 'person' },
+            { id: 'gitarre', name: 'Gitarre', type: 'person' },
+            { id: 'joe_uebungen', name: 'Joe Übungen', type: 'person' },
+            { id: 'nicht_da', name: 'Nicht da', type: 'person' }
+        ];
+
+        // App State
+        let categories = [];
+        let entries = {}; // Struktur: { "YYYY-MM-DD": { [catId]: value } }
+        let currentDate = getTodayISO();
+        let selectedNewCatType = 'person';
+
+        // Hilfsfunktion: Heutiges Datum als YYYY-MM-DD (lokale Zeitzone)
+        function getTodayISO() {
+            const now = new Date();
+            const offset = now.getTimezoneOffset() * 60000;
+            return new Date(now - offset).toISOString().split('T')[0];
+        }
+
+        // Initialisierung beim Laden
+        window.addEventListener('DOMContentLoaded', () => {
+            loadData();
+            initTheme();
+            setDate(currentDate);
+            lucide.createIcons();
+        });
+
+        // Daten aus LocalStorage laden
+        function loadData() {
+            try {
+                const savedCats = localStorage.getItem('nf_tracker_categories');
+                const savedEntries = localStorage.getItem('nf_tracker_entries');
+                categories = savedCats ? JSON.parse(savedCats) : [...DEFAULT_CATEGORIES];
+                // Sicherstellen, dass die Kategorie "Nicht da" auch bei bestehenden Daten ergänzt wird
+                if (!categories.some(c => c.id === 'nicht_da')) {
+                    categories.push({ id: 'nicht_da', name: 'Nicht da', type: 'person' });
+                }
+                entries = savedEntries ? JSON.parse(savedEntries) : {};
+            } catch (e) {
+                console.error("Fehler beim Laden:", e);
+                categories = [...DEFAULT_CATEGORIES];
+                entries = {};
+            }
+        }
+
+        // Daten speichern
+        function saveData(showFeedback = false) {
+            try {
+                localStorage.setItem('nf_tracker_categories', JSON.stringify(categories));
+                localStorage.setItem('nf_tracker_entries', JSON.stringify(entries));
+                if (showFeedback) showToast("Gespeichert");
+            } catch (e) {
+                showToast("Fehler beim Speichern!");
+            }
+        }
+
+        // Datum setzen und UI aktualisieren
+        function setDate(isoDate) {
+            currentDate = isoDate;
+            document.getElementById('datePicker').value = isoDate;
+            
+            const dateObj = new Date(isoDate + 'T12:00:00');
+            const today = getTodayISO();
+            const options = { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' };
+            let label = dateObj.toLocaleDateString('de-AT', options);
+            if (isoDate === today) label = "Heute • " + label;
+            document.getElementById('weekdayLabel').textContent = label;
+
+            renderCategories();
+        }
+
+        function changeDate(delta) {
+            const dateObj = new Date(currentDate + 'T12:00:00');
+            dateObj.setDate(dateObj.getDate() + delta);
+            const offset = dateObj.getTimezoneOffset() * 60000;
+            setDate(new Date(dateObj - offset).toISOString().split('T')[0]);
+        }
+
+        function onDateInput(val) {
+            if (val) setDate(val);
+        }
+
+        // Kategorien für den gewählten Tag rendern
+        function renderCategories() {
+            const container = document.getElementById('categoriesContainer');
+            container.innerHTML = '';
+            const dayData = entries[currentDate] || {};
+
+            categories.forEach((cat, index) => {
+                const val = dayData[cat.id];
+                const card = document.createElement('div');
+                card.className = "bg-white dark:bg-slate-800 rounded-2xl p-3.5 shadow-xs border border-slate-100 dark:border-slate-700/80 flex items-center justify-between gap-2 transition";
+
+                // Linke Seite: Titel & ggf. Badge
+                const leftDiv = document.createElement('div');
+                leftDiv.className = "flex-1 min-w-0";
+                
+                let badgeHTML = '';
+                if (cat.fixedOwner === 'Nicole') {
+                    badgeHTML = `<span class="inline-block w-2 h-2 rounded-full bg-pink-500 mr-1.5"></span>`;
+                } else if (cat.fixedOwner === 'Florian') {
+                    badgeHTML = `<span class="inline-block w-2 h-2 rounded-full bg-blue-600 mr-1.5"></span>`;
+                }
+
+                leftDiv.innerHTML = `
+                    <div class="font-semibold text-sm text-slate-800 dark:text-slate-100 truncate flex items-center">
+                        ${badgeHTML}<span>${cat.name}</span>
+                    </div>
+                `;
+
+                // Rechte Seite: Eingabe-Steuerung je nach Typ
+                const rightDiv = document.createElement('div');
+                rightDiv.className = "flex items-center gap-1.5 shrink-0";
+
+                if (cat.type === 'person') {
+                    // Auswahl: Nicole und/oder Florian
+                    const currentArr = Array.isArray(val) ? val : [];
+                    const isNicole = currentArr.includes('Nicole');
+                    const isFlo = currentArr.includes('Florian');
+
+                    rightDiv.innerHTML = `
+                        <button onclick="togglePerson('${cat.id}', 'Nicole')" 
+                            class="px-3.5 py-2 rounded-xl text-xs font-bold transition active:scale-95 border ${isNicole 
+                                ? 'bg-pink-600 text-white border-pink-600 shadow-xs' 
+                                : 'bg-pink-50/70 dark:bg-slate-700 text-pink-700 dark:text-pink-300 border-pink-200 dark:border-slate-600'}">
+                            Nicole
+                        </button>
+                        <button onclick="togglePerson('${cat.id}', 'Florian')" 
+                            class="px-3.5 py-2 rounded-xl text-xs font-bold transition active:scale-95 border ${isFlo 
+                                ? 'bg-blue-600 text-white border-blue-600 shadow-xs' 
+                                : 'bg-blue-50/70 dark:bg-slate-700 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-slate-600'}">
+                            Florian
+                        </button>
+                    `;
+                } else if (cat.type === 'minutes') {
+                    // Minuten-Eingabe (entweder fix für eine Person oder getrennt für Nicole & Flo)
+                    if (cat.fixedOwner) {
+                        const mins = typeof val === 'number' ? val : '';
+                        const accent = cat.fixedOwner === 'Nicole' ? 'focus:border-pink-500' : 'focus:border-blue-600';
+                        rightDiv.innerHTML = `
+                            <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-700 rounded-xl px-2.5 py-1.5">
+                                <input type="number" inputmode="numeric" min="0" max="1440" placeholder="0" value="${mins}"
+                                    onchange="setMinutesSingle('${cat.id}', this.value)"
+                                    class="w-12 bg-transparent text-right font-bold text-sm focus:outline-none ${accent}">
+                                <span class="text-xs text-slate-500 dark:text-slate-400">Min</span>
+                            </div>
+                        `;
+                    } else {
+                        // Minuten für Nicole & Florian getrennt (z.B. "Kinder (Minuten)")
+                        const obj = (typeof val === 'object' && val !== null) ? val : { Nicole: '', Florian: '' };
+                        rightDiv.innerHTML = `
+                            <div class="flex items-center gap-1.5">
+                                <div class="flex items-center bg-pink-50 dark:bg-slate-700 border border-pink-200 dark:border-slate-600 rounded-xl px-2 py-1">
+                                    <span class="text-[10px] font-bold text-pink-600 dark:text-pink-400 mr-1">N:</span>
+                                    <input type="number" inputmode="numeric" min="0" placeholder="0" value="${obj.Nicole || ''}"
+                                        onchange="setMinutesPerPerson('${cat.id}', 'Nicole', this.value)"
+                                        class="w-10 bg-transparent text-right font-bold text-xs focus:outline-none">
+                                </div>
+                                <div class="flex items-center bg-blue-50 dark:bg-slate-700 border border-blue-200 dark:border-slate-600 rounded-xl px-2 py-1">
+                                    <span class="text-[10px] font-bold text-blue-600 dark:text-blue-400 mr-1">F:</span>
+                                    <input type="number" inputmode="numeric" min="0" placeholder="0" value="${obj.Florian || ''}"
+                                        onchange="setMinutesPerPerson('${cat.id}', 'Florian', this.value)"
+                                        class="w-10 bg-transparent text-right font-bold text-xs focus:outline-none">
+                                </div>
+                            </div>
+                        `;
+                    }
+                } else if (cat.type === 'count') {
+                    // Anzahl (z.B. Zähneputzen 1-2 oder Geschirrspüler 1-5) mit Personenzuordnung N / F
+                    const max = cat.max || 5;
+                    const obj = (typeof val === 'object' && val !== null) ? val : { Nicole: 0, Florian: 0 };
+                    
+                    if (cat.fixedOwner) {
+                        const count = typeof val === 'number' ? val : 0;
+                        rightDiv.innerHTML = `
+                            <button onclick="cycleCountSingle('${cat.id}', ${max})" 
+                                class="px-3.5 py-2 rounded-xl text-xs font-bold border transition active:scale-95 ${count > 0 
+                                    ? 'bg-indigo-600 text-white border-indigo-600' 
+                                    : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-transparent'}">
+                                ${count > 0 ? count + 'x' : '0'}
+                            </button>
+                        `;
+                    } else {
+                        rightDiv.innerHTML = `
+                            <div class="flex items-center gap-1.5">
+                                <button onclick="cycleCountPerson('${cat.id}', 'Nicole', ${max})" 
+                                    class="px-2.5 py-1.5 rounded-xl text-xs font-bold border transition active:scale-95 ${obj.Nicole > 0 
+                                        ? 'bg-pink-600 text-white border-pink-600' 
+                                        : 'bg-pink-50/70 dark:bg-slate-700 text-pink-700 dark:text-pink-300 border-pink-200 dark:border-slate-600'}">
+                                    N: ${obj.Nicole || 0}
+                                </button>
+                                <button onclick="cycleCountPerson('${cat.id}', 'Florian', ${max})" 
+                                    class="px-2.5 py-1.5 rounded-xl text-xs font-bold border transition active:scale-95 ${obj.Florian > 0 
+                                        ? 'bg-blue-600 text-white border-blue-600' 
+                                        : 'bg-blue-50/70 dark:bg-slate-700 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-slate-600'}">
+                                    F: ${obj.Florian || 0}
+                                </button>
+                            </div>
+                        `;
+                    }
+                } else if (cat.type === 'checkbox') {
+                    // Einfache Checkbox (z.B. Sport Nicole, Tennis Flo)
+                    const checked = Boolean(val);
+                    const activeColor = cat.fixedOwner === 'Nicole' 
+                        ? 'bg-pink-600 border-pink-600 text-white' 
+                        : (cat.fixedOwner === 'Florian' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-emerald-600 border-emerald-600 text-white');
+
+                    rightDiv.innerHTML = `
+                        <button onclick="toggleCheckbox('${cat.id}')" 
+                            class="w-10 h-9 rounded-xl border flex items-center justify-center transition active:scale-90 ${checked 
+                                ? activeColor 
+                                : 'bg-slate-100 dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-transparent'}">
+                            <i data-lucide="check" class="w-5 h-5"></i>
+                        </button>
+                    `;
+                }
+
+                card.appendChild(leftDiv);
+                card.appendChild(rightDiv);
+                container.appendChild(card);
+            });
+
+            lucide.createIcons();
+        }
+
+        // --- INTERAKTIONS-LOGIK ---
+
+        function ensureDayEntry() {
+            if (!entries[currentDate]) entries[currentDate] = {};
+        }
+
+        function togglePerson(catId, person) {
+            ensureDayEntry();
+            let current = Array.isArray(entries[currentDate][catId]) ? [...entries[currentDate][catId]] : [];
+            if (current.includes(person)) {
+                current = current.filter(p => p !== person);
+            } else {
+                current.push(person);
+            }
+            if (current.length === 0) {
+                delete entries[currentDate][catId];
+            } else {
+                entries[currentDate][catId] = current;
+            }
+            saveData();
+            renderCategories();
+        }
+
+        function setMinutesSingle(catId, val) {
+            ensureDayEntry();
+            const num = parseInt(val, 10);
+            if (!num || num <= 0) {
+                delete entries[currentDate][catId];
+            } else {
+                entries[currentDate][catId] = num;
+            }
+            saveData(true);
+        }
+
+        function setMinutesPerPerson(catId, person, val) {
+            ensureDayEntry();
+            const num = parseInt(val, 10) || 0;
+            const current = (typeof entries[currentDate][catId] === 'object' && entries[currentDate][catId] !== null)
+                ? { ...entries[currentDate][catId] }
+                : { Nicole: 0, Florian: 0 };
+            
+            current[person] = num;
+            if (!current.Nicole && !current.Florian) {
+                delete entries[currentDate][catId];
+            } else {
+                entries[currentDate][catId] = current;
+            }
+            saveData(true);
+        }
+
+        function cycleCountPerson(catId, person, max) {
+            ensureDayEntry();
+            const current = (typeof entries[currentDate][catId] === 'object' && entries[currentDate][catId] !== null)
+                ? { ...entries[currentDate][catId] }
+                : { Nicole: 0, Florian: 0 };
+            
+            const nextVal = ((current[person] || 0) + 1) % (max + 1);
+            current[person] = nextVal;
+
+            if (!current.Nicole && !current.Florian) {
+                delete entries[currentDate][catId];
+            } else {
+                entries[currentDate][catId] = current;
+            }
+            saveData();
+            renderCategories();
+        }
+
+        function cycleCountSingle(catId, max) {
+            ensureDayEntry();
+            const current = typeof entries[currentDate][catId] === 'number' ? entries[currentDate][catId] : 0;
+            const nextVal = (current + 1) % (max + 1);
+            if (nextVal === 0) {
+                delete entries[currentDate][catId];
+            } else {
+                entries[currentDate][catId] = nextVal;
+            }
+            saveData();
+            renderCategories();
+        }
+
+        function toggleCheckbox(catId) {
+            ensureDayEntry();
+            if (entries[currentDate][catId]) {
+                delete entries[currentDate][catId];
+            } else {
+                entries[currentDate][catId] = true;
+            }
+            saveData();
+            renderCategories();
+        }
+
+        // --- NEUE KATEGORIE HINZUFÜGEN ---
+
+        function openAddCategoryModal() {
+            document.getElementById('newCatName').value = '';
+            selectNewCatType('person');
+            openModal('addCategoryModal');
+        }
+
+        function selectNewCatType(type) {
+            selectedNewCatType = type;
+            document.querySelectorAll('.type-btn').forEach(btn => {
+                if (btn.dataset.type === type) {
+                    btn.className = "type-btn p-3 rounded-xl border-2 border-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 text-left transition";
+                } else {
+                    btn.className = "type-btn p-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 text-left transition";
+                }
+            });
+
+            const ownerDiv = document.getElementById('ownerOptionDiv');
+            if (type === 'person') {
+                ownerDiv.classList.add('hidden');
+            } else {
+                ownerDiv.classList.remove('hidden');
+            }
+        }
+
+        function saveNewCategory() {
+            const name = document.getElementById('newCatName').value.trim();
+            if (!name) {
+                showToast("Bitte einen Namen eingeben!");
+                return;
+            }
+
+            const ownerChoice = document.getElementById('newCatOwner').value;
+            const id = 'custom_' + Date.now();
+            const newCat = {
+                id,
+                name,
+                type: selectedNewCatType
+            };
+
+            if (selectedNewCatType === 'count') {
+                newCat.max = 5;
+            }
+
+            if (selectedNewCatType !== 'person') {
+                if (ownerChoice === 'Nicole' || ownerChoice === 'Florian') {
+                    newCat.fixedOwner = ownerChoice;
+                } else if (selectedNewCatType === 'minutes' || selectedNewCatType === 'count') {
+                    newCat.perPerson = true;
+                } else {
+                    // Checkbox ohne fixe Person -> als Personenauswahl behandeln
+                    newCat.type = 'person';
+                }
+            }
+
+            categories.push(newCat);
+            saveData();
+            renderCategories();
+            closeModal('addCategoryModal');
+            showToast(`"${name}" hinzugefügt!`);
+        }
+
+        // --- AUSWERTUNG & EXCEL EXPORT ---
+
+        function getDateRange(mode) {
+            const ref = new Date(currentDate + 'T12:00:00');
+            if (mode === 'week') {
+                const day = ref.getDay();
+                const diffToMon = (day === 0 ? -6 : 1) - day;
+                const start = new Date(ref);
+                start.setDate(ref.getDate() + diffToMon);
+                const end = new Date(start);
+                end.setDate(start.getDate() + 6);
+                return {
+                    start: toISO(start),
+                    end: toISO(end),
+                    label: `Woche_${toISO(start)}_bis_${toISO(end)}`
+                };
+            } else if (mode === 'month') {
+                const start = new Date(ref.getFullYear(), ref.getMonth(), 1);
+                const end = new Date(ref.getFullYear(), ref.getMonth() + 1, 0);
+                const monthName = ref.toLocaleDateString('de-AT', { month: 'long', year: 'numeric' });
+                return {
+                    start: toISO(start),
+                    end: toISO(end),
+                    label: `Monat_${monthName.replace(/\s+/g, '_')}`
+                };
+            } else {
+                const allDates = Object.keys(entries).sort();
+                return {
+                    start: allDates[0] || currentDate,
+                    end: allDates[allDates.length - 1] || currentDate,
+                    label: `Gesamt_Auswertung`
+                };
+            }
+        }
+
+        function toISO(dateObj) {
+            const offset = dateObj.getTimezoneOffset() * 60000;
+            return new Date(dateObj - offset).toISOString().split('T')[0];
+        }
+
+        function calculateSummary(startISO, endISO) {
+            const summary = {};
+            categories.forEach(cat => {
+                summary[cat.id] = {
+                    name: cat.name,
+                    type: cat.type,
+                    Nicole: 0,
+                    Florian: 0,
+                    unit: cat.type === 'minutes' ? 'Minuten' : 'Anzahl'
+                };
+            });
+
+            Object.keys(entries).forEach(dateStr => {
+                if (dateStr >= startISO && dateStr <= endISO) {
+                    const day = entries[dateStr];
+                    categories.forEach(cat => {
+                        const val = day[cat.id];
+                        if (!val) return;
+
+                        if (cat.type === 'person' && Array.isArray(val)) {
+                            if (val.includes('Nicole')) summary[cat.id].Nicole += 1;
+                            if (val.includes('Florian')) summary[cat.id].Florian += 1;
+                        } else if (cat.type === 'minutes') {
+                            if (cat.fixedOwner === 'Nicole' && typeof val === 'number') {
+                                summary[cat.id].Nicole += val;
+                            } else if (cat.fixedOwner === 'Florian' && typeof val === 'number') {
+                                summary[cat.id].Florian += val;
+                            } else if (typeof val === 'object') {
+                                summary[cat.id].Nicole += (val.Nicole || 0);
+                                summary[cat.id].Florian += (val.Florian || 0);
+                            }
+                        } else if (cat.type === 'count') {
+                            if (cat.fixedOwner === 'Nicole' && typeof val === 'number') {
+                                summary[cat.id].Nicole += val;
+                            } else if (cat.fixedOwner === 'Florian' && typeof val === 'number') {
+                                summary[cat.id].Florian += val;
+                            } else if (typeof val === 'object') {
+                                summary[cat.id].Nicole += (val.Nicole || 0);
+                                summary[cat.id].Florian += (val.Florian || 0);
+                            }
+                        } else if (cat.type === 'checkbox' && val === true) {
+                            if (cat.fixedOwner === 'Nicole') summary[cat.id].Nicole += 1;
+                            else if (cat.fixedOwner === 'Florian') summary[cat.id].Florian += 1;
+                            else {
+                                summary[cat.id].Nicole += 1;
+                                summary[cat.id].Florian += 1;
+                            }
+                        }
+                    });
+                }
+            });
+
+            return summary;
+        }
+
+        function openExportModal() {
+            const weekRange = getDateRange('week');
+            const monthRange = getDateRange('month');
+            document.getElementById('exportWeekLabel').textContent = `${weekRange.start} bis ${weekRange.end}`;
+            document.getElementById('exportMonthLabel').textContent = `${monthRange.start} bis ${monthRange.end}`;
+            openModal('exportModal');
+        }
+
+        function exportExcel(mode) {
+            try {
+                if (typeof XLSX === 'undefined') {
+                    showToast("Excel-Bibliothek wird noch geladen...");
+                    return;
+                }
+
+                const range = getDateRange(mode);
+                const summary = calculateSummary(range.start, range.end);
+
+                // Tabellenblatt 1: Auswertung nach Person
+                const summaryRows = [
+                    ['Kategorie', 'Einheit', 'Nicole', 'Florian', 'Gesamt']
+                ];
+
+                categories.forEach(cat => {
+                    const s = summary[cat.id];
+                    summaryRows.push([
+                        s.name,
+                        s.unit,
+                        s.Nicole,
+                        s.Florian,
+                        s.Nicole + s.Florian
+                    ]);
+                });
+
+                // Tabellenblatt 2: Tagesprotokoll
+                const headerRow = ['Datum', 'Wochentag', ...categories.map(c => c.name)];
+                const dailyRows = [headerRow];
+
+                const filteredDates = Object.keys(entries)
+                    .filter(d => d >= range.start && d <= range.end)
+                    .sort();
+
+                filteredDates.forEach(dateStr => {
+                    const dayObj = entries[dateStr];
+                    const dateObj = new Date(dateStr + 'T12:00:00');
+                    const weekday = dateObj.toLocaleDateString('de-AT', { weekday: 'short' });
+
+                    const row = [dateStr, weekday];
+                    categories.forEach(cat => {
+                        const val = dayObj[cat.id];
+                        if (!val) {
+                            row.push('');
+                        } else if (Array.isArray(val)) {
+                            row.push(val.join(', '));
+                        } else if (typeof val === 'object') {
+                            const parts = [];
+                            if (val.Nicole) parts.push(`Nicole: ${val.Nicole}`);
+                            if (val.Florian) parts.push(`Florian: ${val.Florian}`);
+                            row.push(parts.join(' | '));
+                        } else if (val === true) {
+                            row.push(cat.fixedOwner || 'Ja');
+                        } else {
+                            row.push(val);
+                        }
+                    });
+                    dailyRows.push(row);
+                });
+
+                const wb = XLSX.utils.book_new();
+                const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
+                const wsDaily = XLSX.utils.aoa_to_sheet(dailyRows);
+
+                wsSummary['!cols'] = [{ wch: 28 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
+
+                XLSX.utils.book_append_sheet(wb, wsSummary, 'Auswertung nach Person');
+                XLSX.utils.book_append_sheet(wb, wsDaily, 'Tagesprotokoll');
+
+                XLSX.writeFile(wb, `Familien_Tracker_${range.label}.xlsx`);
+                closeModal('exportModal');
+                showToast("Excel-Datei heruntergeladen!");
+            } catch (err) {
+                console.error(err);
+                showToast("Fehler beim Excel-Export!");
+            }
+        }
+
+        // --- IN-APP STATISTIK MIT DROPDOWN-FILTER ---
+
+        function getISOWeekNumber(dateObj) {
+            const d = new Date(Date.UTC(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate()));
+            const dayNum = d.getUTCDay() || 7;
+            d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+            const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+            return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+        }
+
+        function populateFilterDropdowns() {
+            const weekSelect = document.getElementById('statsWeekFilter');
+            const catSelect = document.getElementById('statsCategoryFilter');
+
+            // 1. Kategorien-Dropdown befüllen
+            const prevCat = catSelect.value || 'ALL';
+            catSelect.innerHTML = '<option value="ALL">Alle Kategorien</option>';
+            categories.forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat.id;
+                opt.textContent = cat.name;
+                catSelect.appendChild(opt);
+            });
+            catSelect.value = categories.some(c => c.id === prevCat) ? prevCat : 'ALL';
+
+            // 2. Wochen-Dropdown befüllen (Aktuelle Woche, letzte 8 Wochen + Aktueller Monat)
+            weekSelect.innerHTML = '';
+            const refDate = new Date(currentDate + 'T12:00:00');
+            const day = refDate.getDay();
+            const diffToMon = (day === 0 ? -6 : 1) - day;
+            const currentMonday = new Date(refDate);
+            currentMonday.setDate(refDate.getDate() + diffToMon);
+
+            for (let i = 0; i < 8; i++) {
+                const start = new Date(currentMonday);
+                start.setDate(currentMonday.getDate() - (i * 7));
+                const end = new Date(start);
+                end.setDate(start.getDate() + 6);
+
+                const kw = getISOWeekNumber(start);
+                const startShort = start.toLocaleDateString('de-AT', { day: '2-digit', month: '2-digit' });
+                const endShort = end.toLocaleDateString('de-AT', { day: '2-digit', month: '2-digit' });
+
+                const opt = document.createElement('option');
+                opt.value = `${toISO(start)}|${toISO(end)}`;
+                opt.textContent = i === 0 
+                    ? `Aktuelle KW ${kw} (${startShort}–${endShort})` 
+                    : `KW ${kw} (${startShort}–${endShort})`;
+                weekSelect.appendChild(opt);
+            }
+
+            // Option für gesamten aktuellen Monat hinzufügen
+            const monthRange = getDateRange('month');
+            const monthOpt = document.createElement('option');
+            monthOpt.value = `${monthRange.start}|${monthRange.end}|MONTH`;
+            monthOpt.textContent = `Gesamter Monat (${refDate.toLocaleDateString('de-AT', { month: 'long' })})`;
+            weekSelect.appendChild(monthOpt);
+        }
+
+        function openStatsModal() {
+            populateFilterDropdowns();
+            openModal('statsModal');
+            renderFilteredStats();
+        }
+
+        function renderFilteredStats() {
+            const weekVal = document.getElementById('statsWeekFilter').value;
+            const selectedCatId = document.getElementById('statsCategoryFilter').value;
+            const parts = weekVal.split('|');
+            const startISO = parts[0];
+            const endISO = parts[1];
+            const isMonthView = parts[2] === 'MONTH';
+
+            const summary = calculateSummary(startISO, endISO);
+            const container = document.getElementById('statsContent');
+
+            const filteredCats = selectedCatId === 'ALL' 
+                ? categories 
+                : categories.filter(c => c.id === selectedCatId);
+
+            // Kumulierte Werte berechnen (besonders relevant für Monatsansicht)
+            let totalTasksN = 0, totalTasksF = 0;
+            let totalMinsN = 0, totalMinsF = 0;
+            filteredCats.forEach(cat => {
+                const s = summary[cat.id];
+                if (cat.type === 'minutes') {
+                    totalMinsN += s.Nicole;
+                    totalMinsF += s.Florian;
+                } else {
+                    totalTasksN += s.Nicole;
+                    totalTasksF += s.Florian;
+                }
+            });
+
+            let html = `
+                <div class="text-[11px] text-slate-500 mb-2 text-center">Zeitraum: ${startISO} bis ${endISO}</div>
+            `;
+
+            if (isMonthView) {
+                html += `
+                    <div class="bg-slate-100 dark:bg-slate-700/60 rounded-2xl p-3 mb-3 border border-slate-200 dark:border-slate-600">
+                        <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2 text-center">Kumulierte Monats-Summe</div>
+                        <div class="grid grid-cols-2 gap-2 text-center">
+                            <div class="bg-white dark:bg-slate-800 rounded-xl p-2 border border-pink-100 dark:border-slate-700">
+                                <div class="text-[11px] font-bold text-pink-600">Nicole Gesamt</div>
+                                <div class="text-sm font-extrabold text-slate-800 dark:text-white mt-0.5">${totalTasksN}x <span class="text-xs font-normal text-slate-400">|</span> ${totalMinsN} Min</div>
+                            </div>
+                            <div class="bg-white dark:bg-slate-800 rounded-xl p-2 border border-blue-100 dark:border-slate-700">
+                                <div class="text-[11px] font-bold text-blue-600">Florian Gesamt</div>
+                                <div class="text-sm font-extrabold text-slate-800 dark:text-white mt-0.5">${totalTasksF}x <span class="text-xs font-normal text-slate-400">|</span> ${totalMinsF} Min</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            html += `
+                <div class="grid grid-cols-12 font-bold text-slate-500 border-b border-slate-200 dark:border-slate-700 pb-1.5">
+                    <div class="col-span-6">Kategorie</div>
+                    <div class="col-span-3 text-right text-pink-600">Nicole</div>
+                    <div class="col-span-3 text-right text-blue-600">Florian</div>
+                </div>
+            `;
+
+            filteredCats.forEach(cat => {
+                const s = summary[cat.id];
+                const suffix = cat.type === 'minutes' ? 'm' : 'x';
+                html += `
+                    <div class="grid grid-cols-12 py-2 border-b border-slate-100 dark:border-slate-700/50 items-center">
+                        <div class="col-span-6 font-medium truncate pr-2">${s.name}</div>
+                        <div class="col-span-3 text-right font-bold ${s.Nicole > 0 ? 'text-pink-600' : 'text-slate-400'}">${s.Nicole > 0 ? s.Nicole + suffix : '-'}</div>
+                        <div class="col-span-3 text-right font-bold ${s.Florian > 0 ? 'text-blue-600' : 'text-slate-400'}">${s.Florian > 0 ? s.Florian + suffix : '-'}</div>
+                    </div>
+                `;
+            });
+
+            // Wenn eine einzelne Kategorie gefiltert wurde, auch die einzelnen Tage in dieser Woche auflisten
+            if (selectedCatId !== 'ALL') {
+                const cat = filteredCats[0];
+                html += `<div class="mt-4 pt-2 border-t border-slate-200 dark:border-slate-700 font-bold text-slate-600 dark:text-slate-300">Tagesdetails (${cat.name}):</div>`;
+                
+                const matchingDates = Object.keys(entries)
+                    .filter(d => d >= startISO && d <= endISO && entries[d][cat.id])
+                    .sort();
+
+                if (matchingDates.length === 0) {
+                    html += `<div class="text-slate-400 italic py-2">Keine Einträge in diesem Zeitraum.</div>`;
+                } else {
+                    matchingDates.forEach(d => {
+                        const val = entries[d][cat.id];
+                        let displayVal = '';
+                        if (Array.isArray(val)) displayVal = val.join(', ');
+                        else if (typeof val === 'object') {
+                            const parts = [];
+                            if (val.Nicole) parts.push(`Nicole: ${val.Nicole}`);
+                            if (val.Florian) parts.push(`Florian: ${val.Florian}`);
+                            displayVal = parts.join(' | ');
+                        } else if (val === true) displayVal = cat.fixedOwner || 'Erledigt';
+                        else displayVal = `${val} Min`;
+
+                        const dateFormatted = new Date(d + 'T12:00:00').toLocaleDateString('de-AT', { weekday: 'short', day: '2-digit', month: '2-digit' });
+                        html += `
+                            <div class="flex justify-between py-1.5 px-2 rounded-lg bg-slate-50 dark:bg-slate-700/40">
+                                <span class="font-medium">${dateFormatted}</span>
+                                <span class="font-bold text-indigo-600 dark:text-indigo-400">${displayVal}</span>
+                            </div>
+                        `;
+                    });
+                }
+            }
+
+            container.innerHTML = html;
+        }
+
+        // --- UI HELPER ---
+
+        function openModal(id) {
+            const el = document.getElementById(id);
+            el.classList.remove('hidden');
+            el.classList.add('flex');
+            lucide.createIcons();
+        }
+
+        function closeModal(id) {
+            const el = document.getElementById(id);
+            el.classList.add('hidden');
+            el.classList.remove('flex');
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastText').textContent = msg;
+            toast.classList.remove('opacity-0');
+            setTimeout(() => toast.classList.add('opacity-0'), 2000);
+        }
+
+        function initTheme() {
+            if (localStorage.getItem('nf_theme') === 'dark') {
+                document.documentElement.classList.add('dark');
+            }
+        }
+
+        function toggleTheme() {
+            const isDark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('nf_theme', isDark ? 'dark' : 'light');
+        }
+
+        // Exportiert den aktuellen HTML-Quellcode inkl. selbst angelegter Kategorien als .html-Datei
+        function exportSourceCode() {
+            try {
+                let htmlSource = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+                // Aktuelle Kategorien (inkl. selbst erstellter) direkt in DEFAULT_CATEGORIES einbetten
+                const serializedCats = JSON.stringify(categories, null, 12);
+                htmlSource = htmlSource.replace(
+                    /const DEFAULT_CATEGORIES = \[[\s\S]*?\];/,
+                    `const DEFAULT_CATEGORIES = ${serializedCats};`
+                );
+
+                const blob = new Blob([htmlSource], { type: 'text/html;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Familien_Tracker_Code_${getTodayISO()}.html`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                showToast("HTML-Code heruntergeladen!");
+            } catch (e) {
+                console.error(e);
+                showToast("Fehler beim Code-Export!");
+            }
+        }
+    </script>
+</body>
+</html>
